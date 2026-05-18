@@ -14,18 +14,18 @@ void setup() {
   lcd.backlight();
   
   if (!bme.begin(0x76)) {
-    lcd.print("BME Hatasi!");
+    lcd.print("BME Error");
     while (1);
   }
   
   mpu.initialize();
   if (!mpu.testConnection()) {
-    lcd.print("MPU Hatasi!");
+    lcd.print("MPU Error");
     while (1);
   }
 
   lcd.clear();
-  lcd.print("CycloPath Hazir!");
+  lcd.print("CycloPath Ready");
   delay(2000);
 }
 
@@ -43,7 +43,7 @@ void loop() {
   lcd.print("T: "); lcd.print(temp, 0); lcd.print("C");
 
   lcd.setCursor(0, 1);
-  lcd.print("Egim: %"); 
+  lcd.print("Slope: %"); 
   lcd.print(tan(angle * PI / 180) * 100, 1);
 
   delay(1000);
