@@ -1,11 +1,21 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <Adafruit_BME280.h>
 #include <MPU6050.h>
 
-LiquidCrystal_I2C lcd(0x27, 16, 2); 
+// Test için BMP180 kullanmak istiyorsaniz bu satiri aktif birakin, 
+// orjinal BME280'e donmek icin yorum satiri yapin: //#define USE_BMP180
+#define USE_BMP180 
+
+#ifdef USE_BMP180
+#include <Adafruit_BMP085.h>
+Adafruit_BMP085 bmp;
+#else
+#include <Adafruit_BME280.h>
 Adafruit_BME280 bme;
+#endif
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
 MPU6050 mpu;
 
 void setup() {
@@ -13,10 +23,17 @@ void setup() {
   lcd.init();
   lcd.backlight();
   
+#ifdef USE_BMP180
+  if (!bmp.begin()) {
+    lcd.print("BMP Error");
+    while (1);
+  }
+#else
   if (!bme.begin(0x76)) {
     lcd.print("BME Error");
     while (1);
   }
+#endif
   
   mpu.initialize();
   if (!mpu.testConnection()) {
@@ -30,8 +47,13 @@ void setup() {
 }
 
 void loop() {
+#ifdef USE_BMP180
+  float temp = bmp.readTemperature();
+  float alt = bmp.readAltitude(101325);
+#else
   float temp = bme.readTemperature();
   float alt = bme.readAltitude(1013.25); 
+#endif
 
   int16_t ax, ay, az;
   mpu.getAcceleration(&ax, &ay, &az);
