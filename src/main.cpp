@@ -4,18 +4,9 @@
 #include <MPU6050.h>
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
-
-// Comment out the following line to use the BME280 instead of the BMP180
-#define USE_BMP180 
-
-#ifdef USE_BMP180
-#include <Adafruit_BMP085.h>
-Adafruit_BMP085 bmp;
-#else
 #include <Adafruit_BME280.h>
-Adafruit_BME280 bme;
-#endif
 
+Adafruit_BME280 bme;
 LiquidCrystal_I2C lcd(0x27, 16, 2); 
 MPU6050 mpu;
 
@@ -32,26 +23,11 @@ const unsigned long updateInterval = 1000;
 
 void setup() {
   Serial.begin(9600);
+  Wire.begin(); 
   lcd.init();
   lcd.backlight();
   
-#ifdef USE_BMP180
-  if (!bmp.begin()) {
-    lcd.print("BMP Error");
-    while (1);
-  }
-#else
-  if (!bme.begin(0x76)) {
-    lcd.print("BME Error");
-    while (1);
-  }
-#endif
-  
   mpu.initialize();
-  if (!mpu.testConnection()) {
-    lcd.print("MPU Error");
-    while (1);
-  }
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   
@@ -64,35 +40,57 @@ void setup() {
 
 void loop() {
   while (gpsSerial.available() > 0) {
-    gps.encode(gpsSerial.read());
+    char c = gpsSerial.read();
+    Serial.write(c); // RAW GPS data test on serial monitor
+    gps.encode(c);
   }
 
-  static bool lastButtonState = HIGH;
   bool currentButtonState = digitalRead(BUTTON_PIN);
-  
-  if (lastButtonState == HIGH && currentButtonState == LOW) {
-    currentPage = (currentPage == 1) ? 2 : 1;
-    lcd.clear(); // Clear screen
-    lastUpdate = millis() - updateInterval; // Force Update
-    delay(50); // Debounce
+
+  if (currentButtonState == LOW) { // Change page on button press
+    delay(50);
+    if (digitalRead(BUTTON_PIN) == LOW) {
+      if (currentPage == 1) {
+        currentPage = 2;
+      } else {
+        currentPage = 1;
+      }
+      lcd.clear(); 
+      
+      while(digitalRead(BUTTON_PIN) == LOW) {
+        while (gpsSerial.available() > 0) {
+          gps.encode(gpsSerial.read());
+        }
+      }
+      lastUpdate = millis() - updateInterval; 
+    }
   }
-  lastButtonState = currentButtonState;
 
   if (millis() - lastUpdate >= updateInterval) {
     lastUpdate = millis();
 
     if (currentPage == 1) {
-#ifdef USE_BMP180
-      float temp = bmp.readTemperature();
-      float alt = bmp.readAltitude(101325);
-#else
       float temp = bme.readTemperature();
-      float alt = bme.readAltitude(1013.25); 
-#endif
+      float alt = bme.readAltitude(1013.25);
 
-      int16_t ax, ay, az;
-      mpu.getAcceleration(&ax, &ay, &az);
-      float angle = atan2(ax, az) * 180 / PI;
+      long sum_ax = 0, sum_az = 0;
+      for (int i = 0; i < 20; i++) {
+        int16_t ax, ay, az;
+        mpu.getAcceleration(&ax, &ay, &az);
+        sum_ax += ax;
+        sum_az += az;
+        delay(2);
+      }
+      float avg_ax = sum_ax / 20.0;
+      float avg_az = sum_az / 20.0;
+
+      float slope_pct = 0.0;
+      if (abs(avg_az) > 100) {
+        slope_pct = (avg_ax / avg_az) * 100.0;
+      }
+      
+      if (slope_pct > 99.9) slope_pct = 99.9;
+      if (slope_pct < -99.9) slope_pct = -99.9;
 
       lcd.setCursor(0, 0);
       lcd.print("Alt: "); lcd.print(alt, 0); lcd.print("m ");
@@ -100,24 +98,27 @@ void loop() {
 
       lcd.setCursor(0, 1);
       lcd.print("Slope: %"); 
-      lcd.print(tan(angle * PI / 180) * 100, 1);
-      lcd.print("    "); // Reset Screen
+      if(slope_pct >= 0) lcd.print("+");
+      lcd.print(slope_pct, 1);
+      lcd.print("    ");
     } 
     else if (currentPage == 2) {
       lcd.setCursor(0, 0);
-      lcd.print("Spd: ");
-      if (gps.speed.isValid()) {
-        lcd.print(gps.speed.kmph(), 1); 
-        lcd.print(" km/h  ");
+      if (gps.location.isValid()) {
+        lcd.print("Lat: ");
+        lcd.print(gps.location.lat(), 5);
+        lcd.print("   ");
       } else {
-        lcd.print("--.- km/h  ");
+        lcd.print("Lat: Bekleniyor ");
       }
       
       lcd.setCursor(0, 1);
       if (gps.location.isValid()) {
-        lcd.print("GPS: Baglandi   "); 
+        lcd.print("Lon: ");
+        lcd.print(gps.location.lng(), 5);
+        lcd.print("   ");
       } else {
-        lcd.print("GPS Yükleniyor.."); 
+        lcd.print("Lon: Bekleniyor ");
       }
     }
   }
