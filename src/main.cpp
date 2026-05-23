@@ -189,8 +189,13 @@ void loop() {
       if (slope_pct < -99.9) slope_pct = -99.9;
 
       lcd.setCursor(0, 0);
-      lcd.print("Alt: "); lcd.print(alt, 0); lcd.print("m ");
-      lcd.print("T: "); lcd.print(temp, 0); lcd.print("C");
+      lcd.print("Alt: "); 
+      if(isnan(alt)) lcd.print("--"); else lcd.print(alt, 0); 
+      lcd.print("m ");
+      
+      lcd.print("T: "); 
+      if(isnan(temp)) lcd.print("--"); else lcd.print(temp, 0); 
+      lcd.print("C");
 
       lcd.setCursor(0, 1);
       lcd.print("Slope: %"); 

@@ -27,7 +27,9 @@
       "top": -61,
       "left": 172.8,
       "attrs": { "color": "black", "xray": "1" }
-    }
+    },
+    { "type": "wokwi-microsd-card", "id": "sd1", "top": -210, "left": -20, "attrs": {} },
+    { "type": "board-ssd1306", "id": "gps_placeholder", "top": -200, "left": 150, "attrs": {} }
   ],
   "connections": [
     [ "bb1:12b.i", "bb1:bp.1", "red", [ "h-85.6" ] ],
@@ -89,7 +91,19 @@
     [ "btn2:1.l", "bb1:32t.e", "", [ "$bb" ] ],
     [ "btn2:1.r", "bb1:39t.e", "", [ "$bb" ] ],
     [ "btn1:2.l", "bb1:bn.19", "blue", [ "h0" ] ],
-    [ "bb1:10t.b", "btn1:1.r", "green", [ "v57.6", "h201.4" ] ]
+    [ "bb1:10t.b", "btn1:1.r", "green", [ "v57.6", "h201.4" ] ],
+    [ "btn2:2.l", "bb1:bn.27", "blue", [ "h0" ] ],
+    [ "bb1:11t.b", "btn2:1.r", "green", [ "v48", "h249.6" ] ],
+    [ "sd1:CS", "bb1:3t.b", "yellow", [ "v40", "h-20" ] ],
+    [ "sd1:MOSI", "bb1:2t.b", "cyan", [ "v50", "h-15" ] ],
+    [ "sd1:MISO", "bb1:1t.b", "gray", [ "v60", "h-10" ] ],
+    [ "sd1:SCK", "bb1:1b.h", "white", [ "v20", "h-150" ] ],
+    [ "sd1:VCC", "bb1:bp.15", "red", [ "v80", "h10" ] ],
+    [ "sd1:GND", "bb1:bn.15", "blue", [ "v90", "h15" ] ],
+    [ "gps_placeholder:VCC", "bb1:bp.30", "red", [ "v50", "h10" ] ],
+    [ "gps_placeholder:GND", "bb1:bn.30", "blue", [ "v60", "h20" ] ],
+    [ "gps_placeholder:SDA", "bb1:9t.b", "white", [ "v70", "h-100" ] ],
+    [ "gps_placeholder:SCL", "bb1:8t.b", "purple", [ "v80", "h-110" ] ]
   ],
   "dependencies": {}
 }
