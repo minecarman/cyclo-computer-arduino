@@ -5,14 +5,18 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include <Adafruit_BME280.h>
+#include <SPI.h>
+#include <SD.h>
 
 Adafruit_BME280 bme;
 LiquidCrystal_I2C lcd(0x27, 16, 2); 
 MPU6050 mpu;
 
 #define BUTTON_PIN 3
+#define BUTTON_LOG_PIN 2
 #define GPS_RX_PIN 4
 #define GPS_TX_PIN 5
+#define SD_CS_PIN 10
 
 TinyGPSPlus gps;
 SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
@@ -20,6 +24,69 @@ SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
 int currentPage = 1;
 unsigned long lastUpdate = 0;
 const unsigned long updateInterval = 1000;
+
+bool isLogging = false;
+char currentLogFile[13];
+
+void startLogging() {
+  for (int i = 1; i < 1000; i++) {
+    sprintf(currentLogFile, "TRK%03d.GPX", i);
+    if (!SD.exists(currentLogFile)) break;
+  }
+  File f = SD.open(currentLogFile, FILE_WRITE);
+  if (f) {
+    f.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    f.println("<gpx version=\"1.1\" creator=\"CycloPath\">");
+    f.println("<trk><name>Route</name><trkseg>");
+    f.close();
+    isLogging = true;
+    lcd.clear(); 
+    lcd.setCursor(0,0); lcd.print("Kayit: Basladi"); 
+    lcd.setCursor(0,1); lcd.print(currentLogFile); 
+    delay(1500);
+  } else {
+    lcd.clear(); 
+    lcd.setCursor(0,0); lcd.print("SD KART HATASI"); 
+    delay(1500);
+  }
+}
+
+void stopLogging() {
+  if (!isLogging) return;
+  File f = SD.open(currentLogFile, FILE_WRITE);
+  if (f) {
+    f.println("</trkseg></trk>");
+    f.println("</gpx>");
+    f.close();
+  }
+  isLogging = false;
+  lcd.clear(); 
+  lcd.setCursor(0,0); lcd.print("Kayit: Bitti"); 
+  lcd.setCursor(0,1); lcd.print(currentLogFile); 
+  delay(1500);
+}
+
+void logGPSPoint() {
+  if (!isLogging || !gps.location.isValid()) return;
+  
+  File f = SD.open(currentLogFile, FILE_WRITE);
+  if (f) {
+    f.print("<trkpt lat=\"");
+    f.print(gps.location.lat(), 6);
+    f.print("\" lon=\"");
+    f.print(gps.location.lng(), 6);
+    f.println("\">");
+    
+    if (gps.altitude.isValid()) {
+      f.print("<ele>");
+      f.print(gps.altitude.meters(), 1);
+      f.println("</ele>");
+    }
+    
+    f.println("</trkpt>");
+    f.close();
+  }
+}
 
 void setup() {
   Serial.begin(9600);
@@ -30,7 +97,14 @@ void setup() {
   mpu.initialize();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_LOG_PIN, INPUT_PULLUP);
   
+  if (!SD.begin(SD_CS_PIN)) {
+    lcd.clear();
+    lcd.print("SD KART BULUNAMADI");
+    delay(2000); // Sadece uyari verir kodu kitlemez
+  }
+
   gpsSerial.begin(9600);
 
   lcd.clear();
@@ -46,7 +120,26 @@ void loop() {
   }
 
   bool currentButtonState = digitalRead(BUTTON_PIN);
+  bool logButtonState = digitalRead(BUTTON_LOG_PIN);
 
+  // LOG BUTTON (Kayit Baslat / Bitir)
+  if (logButtonState == LOW) {
+    delay(50);
+    if (digitalRead(BUTTON_LOG_PIN) == LOW) {
+      if (isLogging) {
+        stopLogging();
+      } else {
+        startLogging();
+      }
+      
+      while(digitalRead(BUTTON_LOG_PIN) == LOW) {
+        while (gpsSerial.available() > 0) gps.encode(gpsSerial.read());
+      }
+      lastUpdate = millis() - updateInterval; 
+    }
+  }
+
+  // SAYFA BUTONU
   if (currentButtonState == LOW) { // Change page on button press
     delay(50);
     if (digitalRead(BUTTON_PIN) == LOW) {
@@ -68,6 +161,9 @@ void loop() {
 
   if (millis() - lastUpdate >= updateInterval) {
     lastUpdate = millis();
+
+    // Eger kayit aciksa her saniye (veya updateInterval neyse) GPX noktasini kaydet
+    logGPSPoint();
 
     if (currentPage == 1) {
       float temp = bme.readTemperature();
@@ -109,7 +205,7 @@ void loop() {
         lcd.print(gps.location.lat(), 5);
         lcd.print("   ");
       } else {
-        lcd.print("Lat: Bekleniyor ");
+        lcd.print("Lat: Waiting ");
       }
       
       lcd.setCursor(0, 1);
@@ -118,7 +214,7 @@ void loop() {
         lcd.print(gps.location.lng(), 5);
         lcd.print("   ");
       } else {
-        lcd.print("Lon: Bekleniyor ");
+        lcd.print("Lon: Waiting ");
       }
     }
   }
